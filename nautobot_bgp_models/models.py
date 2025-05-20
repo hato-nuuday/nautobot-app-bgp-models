@@ -12,7 +12,7 @@ from nautobot.core.models.generics import OrganizationalModel, PrimaryModel
 from nautobot.core.utils.data import deepmerge
 from nautobot.dcim.fields import ASNField
 from nautobot.extras.models import RoleField, StatusField
-from nautobot.ipam.models import IPAddress, IPAddressToInterface
+from nautobot.ipam.models import IPAddress, IPAddressToInterface, VRF
 from nautobot.tenancy.models import Tenant
 from netutils.asn import int_to_asdot
 
@@ -37,7 +37,9 @@ class InheritanceMixin(models.Model):
         if field_value:
             return field_value, False, None
 
-        if inheritance_path is None and field_name in getattr(self, "property_inheritance", {}):
+        if inheritance_path is None and field_name in getattr(
+            self, "property_inheritance", {}
+        ):
             inheritance_path = self.property_inheritance[field_name]
 
         for path_element in inheritance_path or []:
@@ -60,7 +62,9 @@ class InheritanceMixin(models.Model):
 
         for field_name, field_inheritance in self.property_inheritance.items():
             inheritance_path = field_inheritance if include_inherited else []
-            inheritance_result = self.get_inherited_field(field_name=field_name, inheritance_path=inheritance_path)
+            inheritance_result = self.get_inherited_field(
+                field_name=field_name, inheritance_path=inheritance_path
+            )
             result[field_name] = {
                 "value": inheritance_result[0],
                 "inherited": inheritance_result[1],
@@ -132,14 +136,22 @@ class BGPExtraAttributesMixin(models.Model):
 class AutonomousSystem(PrimaryModel):
     """Autonomous System information."""
 
-    asn = ASNField(unique=True, verbose_name="ASN", help_text="32-bit autonomous system number")
+    asn = ASNField(verbose_name="ASN", help_text="32-bit autonomous system number")
     description = models.CharField(max_length=200, blank=True)
-    provider = models.ForeignKey(to=Provider, on_delete=models.PROTECT, blank=True, null=True)
+    vrf = models.ForeignKey(
+        to=VRF, on_delete=models.PROTECT, blank=True, null=True, related_name="bgp_asns"
+    )
+    provider = models.ForeignKey(
+        to=Provider, on_delete=models.PROTECT, blank=True, null=True
+    )
     status = StatusField(null=True)
 
     class Meta:
         ordering = ["asn"]
         verbose_name = "Autonomous system"
+        constraints = [
+            models.UniqueConstraint(fields=["asn", "vrf"], name="unique_asn_per_vrf")
+        ]
 
     def __str__(self):
         """String representation of an AutonomousSystem."""
@@ -164,14 +176,32 @@ class AutonomousSystemRange(PrimaryModel):
     """Autonomous System Range information."""
 
     name = models.CharField(max_length=255, unique=True, blank=False)
-    asn_min = ASNField(verbose_name="Start", help_text="Min value for 32-bit autonomous system number")
-    asn_max = ASNField(verbose_name="End", help_text="Max value for 32-bit autonomous system number")
+    asn_min = ASNField(
+        verbose_name="Start", help_text="Min value for 32-bit autonomous system number"
+    )
+    asn_max = ASNField(
+        verbose_name="End", help_text="Max value for 32-bit autonomous system number"
+    )
     description = models.CharField(max_length=255, blank=True)
-    tenant = models.ForeignKey(to=Tenant, on_delete=models.PROTECT, blank=True, null=True)
+    vrf = models.ForeignKey(
+        to=VRF,
+        on_delete=models.PROTECT,
+        blank=True,
+        null=True,
+        related_name="bgp_asn_ranges",
+    )
+    tenant = models.ForeignKey(
+        to=Tenant, on_delete=models.PROTECT, blank=True, null=True
+    )
 
     class Meta:
         ordering = ["asn_min"]
         verbose_name = "Autonomous System Range"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["asn_min", "asn_max", "vrf"], name="unique_asrange_per_vrf"
+            )
+        ]
 
     def __str__(self):
         """String representation of an AutonomousSystemRange."""
@@ -184,9 +214,9 @@ class AutonomousSystemRange(PrimaryModel):
 
     def get_next_available_asn(self):
         """Return the first available ASN number in the range, or None if none are available."""
-        asn_nums = AutonomousSystem.objects.filter(asn__gte=self.asn_min, asn__lte=self.asn_max).values_list(
-            "asn", flat=True
-        )
+        asn_nums = AutonomousSystem.objects.filter(
+            asn__gte=self.asn_min, asn__lte=self.asn_max
+        ).values_list("asn", flat=True)
         for i in range(self.asn_min, self.asn_max + 1):
             if i not in asn_nums:
                 return i
@@ -243,7 +273,9 @@ class BGPRoutingInstance(PrimaryModel, BGPExtraAttributesMixin):
         """Clean."""
         # Ensure .status attribute:
         if not self.status:
-            raise ValidationError("Status must be defined for the BGP Routing Instance.")
+            raise ValidationError(
+                "Status must be defined for the BGP Routing Instance."
+            )
 
 
 @extras_features(
@@ -314,7 +346,11 @@ class PeerGroup(PrimaryModel, InheritanceMixin, BGPExtraAttributesMixin):
 
     # Rename to avoid clash with DRF renderer
     peergroup_template = models.ForeignKey(
-        to=PeerGroupTemplate, on_delete=models.PROTECT, related_name="peer_groups", blank=True, null=True
+        to=PeerGroupTemplate,
+        on_delete=models.PROTECT,
+        related_name="peer_groups",
+        blank=True,
+        null=True,
     )
 
     role = RoleField(blank=True, null=True)
@@ -396,10 +432,14 @@ class PeerGroup(PrimaryModel, InheritanceMixin, BGPExtraAttributesMixin):
 
         if self.source_ip:
             # Ensure IP related to the routing instance
-            if self.source_ip not in IPAddress.objects.filter(interfaces__device_id=self.routing_instance.device.id):
+            if self.source_ip not in IPAddress.objects.filter(
+                interfaces__device_id=self.routing_instance.device.id
+            ):
                 raise ValidationError("Group IP not associated with Routing Instance")
             # Ensure VRF membership
-            if self.vrf and (self.vrf not in self.source_ip.parent.vrfs.all()):  # PG's VRF in IPs' VRF
+            if self.vrf and (
+                self.vrf not in self.source_ip.parent.vrfs.all()
+            ):  # PG's VRF in IPs' VRF
                 raise ValidationError(
                     f"VRF mismatch between PeerGroup VRF ({self.vrf}) and selected source IP VRF "
                     f"({self.source_ip.parent.vrfs.all().first()})"
@@ -408,17 +448,23 @@ class PeerGroup(PrimaryModel, InheritanceMixin, BGPExtraAttributesMixin):
         if self.present_in_database:
             original = self.__class__.objects.get(id=self.id)
             if self.vrf != original.vrf and self.endpoints.exists():
-                raise ValidationError("Cannot change VRF of PeerGroup that has existing PeerEndpoints in this VRF.")
+                raise ValidationError(
+                    "Cannot change VRF of PeerGroup that has existing PeerEndpoints in this VRF."
+                )
 
     def validate_unique(self, exclude=None):
         """Validate uniqueness, handling NULL != NULL for VRF foreign key."""
         if (
             self.vrf is None
             and self.__class__.objects.exclude(id=self.id)
-            .filter(routing_instance=self.routing_instance, name=self.name, vrf__isnull=True)
+            .filter(
+                routing_instance=self.routing_instance, name=self.name, vrf__isnull=True
+            )
             .exists()
         ):
-            raise ValidationError(f"Duplicate Peer Group name for {self.routing_instance}")
+            raise ValidationError(
+                f"Duplicate Peer Group name for {self.routing_instance}"
+            )
 
         super().validate_unique(exclude)
 
@@ -437,9 +483,17 @@ class PeerEndpoint(PrimaryModel, InheritanceMixin, BGPExtraAttributesMixin):
 
     natural_key_field_names = ["id"]
 
-    extra_attributes_inheritance = ["peer_group", "peer_group.peergroup_template", "routing_instance"]
+    extra_attributes_inheritance = [
+        "peer_group",
+        "peer_group.peergroup_template",
+        "routing_instance",
+    ]
     property_inheritance = {
-        "autonomous_system": ["peer_group", "peer_group.peergroup_template", "routing_instance"],
+        "autonomous_system": [
+            "peer_group",
+            "peer_group.peergroup_template",
+            "routing_instance",
+        ],
         "description": ["peer_group", "peer_group.peergroup_template"],
         "enabled": ["peer_group", "peer_group.peergroup_template"],
         "source_ip": ["peer_group"],
@@ -522,12 +576,17 @@ class PeerEndpoint(PrimaryModel, InheritanceMixin, BGPExtraAttributesMixin):
         The effective IP Address of an endpoint is based on the above order.
         """
         inherited_source_ip, _, _ = self.get_inherited_field(field_name="source_ip")
-        inherited_source_interface, _, _ = self.get_inherited_field(field_name="source_interface")
+        inherited_source_interface, _, _ = self.get_inherited_field(
+            field_name="source_interface"
+        )
 
         if inherited_source_ip:
             return inherited_source_ip
 
-        if inherited_source_interface and inherited_source_interface.ip_addresses.count() == 1:
+        if (
+            inherited_source_interface
+            and inherited_source_interface.ip_addresses.count() == 1
+        ):
             return inherited_source_interface.ip_addresses.first()
 
         return None
@@ -576,12 +635,17 @@ class PeerEndpoint(PrimaryModel, InheritanceMixin, BGPExtraAttributesMixin):
             ):
                 raise ValidationError("Peer IP not associated with Routing Instance")
         # Enforce Routing Instance if local IP belongs to the Device
-        elif not self.routing_instance and IPAddressToInterface.objects.filter(ip_address=local_ip_value).exists():
+        elif (
+            not self.routing_instance
+            and IPAddressToInterface.objects.filter(ip_address=local_ip_value).exists()
+        ):
             raise ValidationError("Must specify Routing Instance for this IP Address")
 
         # Enforce peer group VRF membership
         if self.peer_group is not None:
-            if self.peer_group.vrf and (self.peer_group.vrf not in local_ip_value.parent.vrfs.all()):
+            if self.peer_group.vrf and (
+                self.peer_group.vrf not in local_ip_value.parent.vrfs.all()
+            ):
                 raise ValidationError(
                     f"VRF mismatch between {local_ip_value} (VRF {local_ip_value.parent.vrfs.all().first()}) "
                     f"and peer-group {self.peer_group.name} (VRF {self.peer_group.vrf})"
@@ -640,7 +704,10 @@ class Peering(OrganizationalModel):
 
     def validate_peers(self):
         """Peer Sanity Checks."""
-        if self.endpoint_a.routing_instance and self.endpoint_a.routing_instance == self.endpoint_z.routing_instance:
+        if (
+            self.endpoint_a.routing_instance
+            and self.endpoint_a.routing_instance == self.endpoint_z.routing_instance
+        ):
             raise ValidationError("Peering between same routing instance not allowed")
 
         if self.endpoint_a.local_ip == self.endpoint_z.local_ip:
@@ -663,7 +730,9 @@ class AddressFamily(OrganizationalModel, BGPExtraAttributesMixin):
 
     natural_key_field_names = ["routing_instance", "vrf", "afi_safi"]
 
-    afi_safi = models.CharField(max_length=64, choices=AFISAFIChoices, verbose_name="AFI-SAFI")
+    afi_safi = models.CharField(
+        max_length=64, choices=AFISAFIChoices, verbose_name="AFI-SAFI"
+    )
 
     vrf = models.ForeignKey(
         to="ipam.VRF",
@@ -698,7 +767,11 @@ class AddressFamily(OrganizationalModel, BGPExtraAttributesMixin):
         if (
             not self.vrf
             and self.__class__.objects.exclude(id=self.id)
-            .filter(routing_instance=self.routing_instance, afi_safi=self.afi_safi, vrf__isnull=True)
+            .filter(
+                routing_instance=self.routing_instance,
+                afi_safi=self.afi_safi,
+                vrf__isnull=True,
+            )
             .exists()
         ):
             raise ValidationError("Duplicate Address Family")
@@ -706,7 +779,11 @@ class AddressFamily(OrganizationalModel, BGPExtraAttributesMixin):
         if (
             self.vrf
             and self.__class__.objects.exclude(id=self.id)
-            .filter(routing_instance=self.routing_instance, afi_safi=self.afi_safi, vrf=self.vrf)
+            .filter(
+                routing_instance=self.routing_instance,
+                afi_safi=self.afi_safi,
+                vrf=self.vrf,
+            )
             .exists()
         ):
             raise ValidationError("Duplicate Address Family")
@@ -723,7 +800,9 @@ class AddressFamily(OrganizationalModel, BGPExtraAttributesMixin):
     "relationships",
     "webhooks",
 )
-class PeerGroupAddressFamily(OrganizationalModel, InheritanceMixin, BGPExtraAttributesMixin):
+class PeerGroupAddressFamily(
+    OrganizationalModel, InheritanceMixin, BGPExtraAttributesMixin
+):
     """Address-family (AFI-SAFI) model for PeerGroup-specific configuration."""
 
     @property
@@ -739,9 +818,13 @@ class PeerGroupAddressFamily(OrganizationalModel, InheritanceMixin, BGPExtraAttr
 
     extra_attributes_inheritance = ["parent_address_family"]
 
-    property_inheritance = {}  # no non-extra-attributes properties inherited from AddressFamily at this time
+    property_inheritance = (
+        {}
+    )  # no non-extra-attributes properties inherited from AddressFamily at this time
 
-    afi_safi = models.CharField(max_length=64, choices=AFISAFIChoices, verbose_name="AFI-SAFI")
+    afi_safi = models.CharField(
+        max_length=64, choices=AFISAFIChoices, verbose_name="AFI-SAFI"
+    )
 
     peer_group = models.ForeignKey(
         to=PeerGroup,
@@ -793,7 +876,9 @@ class PeerGroupAddressFamily(OrganizationalModel, InheritanceMixin, BGPExtraAttr
     "relationships",
     "webhooks",
 )
-class PeerEndpointAddressFamily(OrganizationalModel, InheritanceMixin, BGPExtraAttributesMixin):
+class PeerEndpointAddressFamily(
+    OrganizationalModel, InheritanceMixin, BGPExtraAttributesMixin
+):
     """Address-family (AFI-SAFI) model for PeerEndpoint-specific configuration."""
 
     @property
@@ -818,7 +903,10 @@ class PeerEndpointAddressFamily(OrganizationalModel, InheritanceMixin, BGPExtraA
         except AddressFamily.DoesNotExist:
             return None
 
-    extra_attributes_inheritance = ["parent_peer_group_address_family", "parent_address_family"]
+    extra_attributes_inheritance = [
+        "parent_peer_group_address_family",
+        "parent_address_family",
+    ]
 
     property_inheritance = {
         "import_policy": ["parent_peer_group_address_family"],
@@ -826,7 +914,9 @@ class PeerEndpointAddressFamily(OrganizationalModel, InheritanceMixin, BGPExtraA
         "multipath": ["parent_peer_group_address_family"],
     }
 
-    afi_safi = models.CharField(max_length=64, choices=AFISAFIChoices, verbose_name="AFI-SAFI")
+    afi_safi = models.CharField(
+        max_length=64, choices=AFISAFIChoices, verbose_name="AFI-SAFI"
+    )
 
     peer_endpoint = models.ForeignKey(
         to=PeerEndpoint,

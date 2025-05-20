@@ -25,10 +25,11 @@ class AutonomousSystemForm(NautobotModelForm):
 
     tags = DynamicModelMultipleChoiceField(queryset=Tag.objects.all(), required=False)
     provider = DynamicModelChoiceField(queryset=Provider.objects.all(), required=False)
+    vrf = DynamicModelChoiceField(queryset=VRF.objects.all(), required=False)
 
     class Meta:
         model = models.AutonomousSystem
-        fields = ("asn", "description", "provider", "status", "tags")
+        fields = ("asn", "description", "provider", "status", "vrf", "tags")
 
 
 class AutonomousSystemFilterForm(NautobotFilterForm):
@@ -43,7 +44,8 @@ class AutonomousSystemBulkEditForm(TagsBulkEditFormMixin, NautobotBulkEditForm):
     """Form for bulk-editing multiple AutonomousSystem records."""
 
     pk = forms.ModelMultipleChoiceField(
-        queryset=models.AutonomousSystem.objects.all(), widget=forms.MultipleHiddenInput()
+        queryset=models.AutonomousSystem.objects.all(),
+        widget=forms.MultipleHiddenInput(),
     )
     description = forms.CharField(max_length=200, required=False)
 
@@ -58,10 +60,11 @@ class AutonomousSystemRangeForm(NautobotModelForm):
 
     tags = DynamicModelMultipleChoiceField(queryset=Tag.objects.all(), required=False)
     tenant = DynamicModelChoiceField(queryset=Tenant.objects.all(), required=False)
+    vrf = DynamicModelChoiceField(queryset=VRF.objects.all(), required=False)
 
     class Meta:
         model = models.AutonomousSystemRange
-        fields = ("name", "asn_min", "asn_max", "description", "tenant", "tags")
+        fields = ("name", "asn_min", "asn_max", "description", "vrf", "tenant", "tags")
 
 
 class AutonomousSystemRangeFilterForm(NautobotFilterForm):
@@ -73,16 +76,21 @@ class AutonomousSystemRangeFilterForm(NautobotFilterForm):
 
 
 class AutonomousSystemRangeBulkEditForm(TagsBulkEditFormMixin, NautobotBulkEditForm):
-    """Form for bulk-editing multiple AutonomousSystem records."""
+    """Form for bulk-editing multiple AutonomousSystemRange records."""
 
     pk = forms.ModelMultipleChoiceField(
-        queryset=models.AutonomousSystemRange.objects.all(), widget=forms.MultipleHiddenInput()
+        queryset=models.AutonomousSystemRange.objects.all(),
+        widget=forms.MultipleHiddenInput(),
     )
     description = forms.CharField(max_length=200, required=False)
+    vrf = DynamicModelChoiceField(queryset=VRF.objects.all(), required=False)
+    tenant = DynamicModelChoiceField(queryset=Tenant.objects.all(), required=False)
 
     class Meta:
         nullable_fields = [
             "description",
+            "vrf",
+            "tenant",
         ]
 
 
@@ -129,7 +137,9 @@ class BGPRoutingInstanceForm(NautobotModelForm):
         if commit:
             # Initiate local templates as indicated in the creation form.
             # Templates are only created during object creation.
-            for t in self.cleaned_data.get("peergroup_template", []):  # pylint: disable=invalid-name
+            for t in self.cleaned_data.get(
+                "peergroup_template", []
+            ):  # pylint: disable=invalid-name
                 models.PeerGroup.objects.create(
                     name=t.name,
                     peergroup_template=t,
@@ -187,7 +197,8 @@ class BGPRoutingInstanceBulkEditForm(NautobotBulkEditForm):
     """Form for bulk-editing multiple BGPRoutingInstance records."""
 
     pk = forms.ModelMultipleChoiceField(
-        queryset=models.BGPRoutingInstance.objects.all(), widget=forms.MultipleHiddenInput()
+        queryset=models.BGPRoutingInstance.objects.all(),
+        widget=forms.MultipleHiddenInput(),
     )
     description = forms.CharField(max_length=200, required=False)
 
@@ -227,7 +238,9 @@ class PeerGroupForm(NautobotModelForm):
         queryset=Interface.objects.all(),
         required=False,
         label="Source Interface",
-        query_params={"nautobot_bgp_models_interfaces_bgp_routing_instance": "$routing_instance"},
+        query_params={
+            "nautobot_bgp_models_interfaces_bgp_routing_instance": "$routing_instance"
+        },
     )
 
     autonomous_system = DynamicModelChoiceField(
@@ -236,7 +249,9 @@ class PeerGroupForm(NautobotModelForm):
         label="Autonomous System",
     )
 
-    peergroup_template = DynamicModelChoiceField(queryset=models.PeerGroupTemplate.objects.all(), required=False)
+    peergroup_template = DynamicModelChoiceField(
+        queryset=models.PeerGroupTemplate.objects.all(), required=False
+    )
 
     secret = DynamicModelChoiceField(queryset=Secret.objects.all(), required=False)
 
@@ -265,7 +280,8 @@ class PeerGroupBulkEditForm(NautobotBulkEditForm):
     """Form for bulk-editing multiple PeerGroup records."""
 
     pk = forms.ModelMultipleChoiceField(
-        queryset=models.PeerGroupTemplate.objects.all(), widget=forms.MultipleHiddenInput()
+        queryset=models.PeerGroupTemplate.objects.all(),
+        widget=forms.MultipleHiddenInput(),
     )
     description = forms.CharField(max_length=200, required=False)
 
@@ -303,7 +319,8 @@ class PeerGroupTemplateBulkEditForm(NautobotBulkEditForm):
     """Form for bulk-editing multiple PeerGroupTemplate records."""
 
     pk = forms.ModelMultipleChoiceField(
-        queryset=models.PeerGroupTemplate.objects.all(), widget=forms.MultipleHiddenInput()
+        queryset=models.PeerGroupTemplate.objects.all(),
+        widget=forms.MultipleHiddenInput(),
     )
     description = forms.CharField(max_length=200, required=False)
 
@@ -321,11 +338,16 @@ class PeerGroupFilterForm(NautobotFilterForm, RoleModelFilterFormMixin):
     q = forms.CharField(required=False, label="Search")
 
     enabled = forms.NullBooleanField(
-        required=False, widget=utilities_forms.StaticSelect2(choices=utilities_forms.BOOLEAN_WITH_BLANK_CHOICES)
+        required=False,
+        widget=utilities_forms.StaticSelect2(
+            choices=utilities_forms.BOOLEAN_WITH_BLANK_CHOICES
+        ),
     )
 
     autonomous_system = DynamicModelMultipleChoiceField(
-        queryset=models.AutonomousSystem.objects.all(), to_field_name="asn", required=False
+        queryset=models.AutonomousSystem.objects.all(),
+        to_field_name="asn",
+        required=False,
     )
 
     vrf = DynamicModelMultipleChoiceField(queryset=VRF.objects.all(), required=False)
@@ -339,11 +361,16 @@ class PeerGroupTemplateFilterForm(NautobotFilterForm, RoleModelFilterFormMixin):
     q = forms.CharField(required=False, label="Search")
 
     enabled = forms.NullBooleanField(
-        required=False, widget=utilities_forms.StaticSelect2(choices=utilities_forms.BOOLEAN_WITH_BLANK_CHOICES)
+        required=False,
+        widget=utilities_forms.StaticSelect2(
+            choices=utilities_forms.BOOLEAN_WITH_BLANK_CHOICES
+        ),
     )
 
     autonomous_system = DynamicModelMultipleChoiceField(
-        queryset=models.AutonomousSystem.objects.all(), to_field_name="asn", required=False
+        queryset=models.AutonomousSystem.objects.all(),
+        to_field_name="asn",
+        required=False,
     )
 
 
@@ -359,12 +386,16 @@ class PeerEndpointForm(NautobotModelForm):
 
         _prefix = f"{self.prefix}-" if self.prefix else ""
         self.fields["source_ip"].widget.add_query_param(
-            "nautobot_bgp_models_ips_bgp_routing_instance", f"${_prefix}routing_instance"
+            "nautobot_bgp_models_ips_bgp_routing_instance",
+            f"${_prefix}routing_instance",
         )
         self.fields["source_interface"].widget.add_query_param(
-            "nautobot_bgp_models_interfaces_bgp_routing_instance", f"${_prefix}routing_instance"
+            "nautobot_bgp_models_interfaces_bgp_routing_instance",
+            f"${_prefix}routing_instance",
         )
-        self.fields["peer_group"].widget.add_query_param("routing_instance", f"${_prefix}routing_instance")
+        self.fields["peer_group"].widget.add_query_param(
+            "routing_instance", f"${_prefix}routing_instance"
+        )
 
     routing_instance = DynamicModelChoiceField(
         queryset=models.BGPRoutingInstance.objects.all(),
@@ -444,7 +475,9 @@ class PeerEndpointFilterForm(NautobotFilterForm, RoleModelFilterFormMixin):
 class PeerEndpointBulkEditForm(NautobotBulkEditForm):
     """Form for bulk-editing multiple PeerEndpoint records."""
 
-    pk = forms.ModelMultipleChoiceField(queryset=models.PeerEndpoint.objects.all(), widget=forms.MultipleHiddenInput())
+    pk = forms.ModelMultipleChoiceField(
+        queryset=models.PeerEndpoint.objects.all(), widget=forms.MultipleHiddenInput()
+    )
 
     class Meta:
         nullable_fields = []
@@ -470,7 +503,9 @@ class PeeringFilterForm(NautobotFilterForm):
         "peer_endpoint_role",
     ]
 
-    device = DynamicModelMultipleChoiceField(queryset=Device.objects.all(), to_field_name="name", required=False)
+    device = DynamicModelMultipleChoiceField(
+        queryset=Device.objects.all(), to_field_name="name", required=False
+    )
 
     device_role = DynamicModelMultipleChoiceField(
         queryset=Role.objects.all(),
@@ -519,7 +554,9 @@ class AddressFamilyForm(NautobotModelForm):
 class AddressFamilyBulkEditForm(NautobotBulkEditForm):
     """Form for bulk-editing multiple AddressFamily records."""
 
-    pk = forms.ModelMultipleChoiceField(queryset=models.AddressFamily.objects.all(), widget=forms.MultipleHiddenInput())
+    pk = forms.ModelMultipleChoiceField(
+        queryset=models.AddressFamily.objects.all(), widget=forms.MultipleHiddenInput()
+    )
 
     class Meta:
         nullable_fields = []
@@ -530,7 +567,9 @@ class AddressFamilyFilterForm(NautobotFilterForm):
 
     model = models.AddressFamily
 
-    routing_instance = DynamicModelMultipleChoiceField(queryset=models.BGPRoutingInstance.objects.all(), required=False)
+    routing_instance = DynamicModelMultipleChoiceField(
+        queryset=models.BGPRoutingInstance.objects.all(), required=False
+    )
 
     afi_safi = forms.MultipleChoiceField(
         label="AFI-SAFI",
@@ -558,7 +597,9 @@ class PeerGroupAddressFamilyForm(NautobotModelForm):
         widget=utilities_forms.StaticSelect2(),
     )
 
-    multipath = forms.NullBooleanField(required=False, widget=utilities_forms.BulkEditNullBooleanSelect())
+    multipath = forms.NullBooleanField(
+        required=False, widget=utilities_forms.BulkEditNullBooleanSelect()
+    )
 
     class Meta:
         model = models.PeerGroupAddressFamily
@@ -576,11 +617,14 @@ class PeerGroupAddressFamilyBulkEditForm(NautobotBulkEditForm):
     """Form for bulk-editing multiple PeerGroupAddressFamily records."""
 
     pk = forms.ModelMultipleChoiceField(
-        queryset=models.PeerGroupAddressFamily.objects.all(), widget=forms.MultipleHiddenInput()
+        queryset=models.PeerGroupAddressFamily.objects.all(),
+        widget=forms.MultipleHiddenInput(),
     )
     import_policy = forms.CharField(max_length=100, required=False)
     export_policy = forms.CharField(max_length=100, required=False)
-    multipath = forms.NullBooleanField(required=False, widget=utilities_forms.BulkEditNullBooleanSelect())
+    multipath = forms.NullBooleanField(
+        required=False, widget=utilities_forms.BulkEditNullBooleanSelect()
+    )
 
     class Meta:
         nullable_fields = ["import_policy", "export_policy", "multipath"]
@@ -591,7 +635,9 @@ class PeerGroupAddressFamilyFilterForm(NautobotFilterForm):
 
     model = models.PeerGroupAddressFamily
 
-    peer_group = DynamicModelMultipleChoiceField(queryset=models.PeerGroup.objects.all(), required=False)
+    peer_group = DynamicModelMultipleChoiceField(
+        queryset=models.PeerGroup.objects.all(), required=False
+    )
 
     afi_safi = forms.MultipleChoiceField(
         label="AFI-SAFI",
@@ -617,7 +663,9 @@ class PeerEndpointAddressFamilyForm(NautobotModelForm):
         widget=utilities_forms.StaticSelect2(),
     )
 
-    multipath = forms.NullBooleanField(required=False, widget=utilities_forms.BulkEditNullBooleanSelect())
+    multipath = forms.NullBooleanField(
+        required=False, widget=utilities_forms.BulkEditNullBooleanSelect()
+    )
 
     class Meta:
         model = models.PeerEndpointAddressFamily
@@ -635,11 +683,14 @@ class PeerEndpointAddressFamilyBulkEditForm(NautobotBulkEditForm):
     """Form for bulk-editing multiple PeerEndpointAddressFamily records."""
 
     pk = forms.ModelMultipleChoiceField(
-        queryset=models.PeerEndpointAddressFamily.objects.all(), widget=forms.MultipleHiddenInput()
+        queryset=models.PeerEndpointAddressFamily.objects.all(),
+        widget=forms.MultipleHiddenInput(),
     )
     import_policy = forms.CharField(max_length=100, required=False)
     export_policy = forms.CharField(max_length=100, required=False)
-    multipath = forms.NullBooleanField(required=False, widget=utilities_forms.BulkEditNullBooleanSelect())
+    multipath = forms.NullBooleanField(
+        required=False, widget=utilities_forms.BulkEditNullBooleanSelect()
+    )
 
     class Meta:
         nullable_fields = ["import_policy", "export_policy", "multipath"]
@@ -650,7 +701,9 @@ class PeerEndpointAddressFamilyFilterForm(NautobotFilterForm):
 
     model = models.PeerEndpointAddressFamily
 
-    peer_endpoint = DynamicModelMultipleChoiceField(queryset=models.PeerEndpoint.objects.all(), required=False)
+    peer_endpoint = DynamicModelMultipleChoiceField(
+        queryset=models.PeerEndpoint.objects.all(), required=False
+    )
 
     afi_safi = forms.MultipleChoiceField(
         label="AFI-SAFI",

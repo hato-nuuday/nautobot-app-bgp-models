@@ -34,14 +34,37 @@ class AutonomousSystemTable(StatusTableMixin, BaseTable):
     pk = ToggleColumn()
     asn = tables.TemplateColumn(template_code=ASN_LINK, verbose_name="ASN")
     provider = tables.LinkColumn()
+    vrf = tables.LinkColumn()
     tags = TagColumn(url_name="plugins:nautobot_bgp_models:autonomoussystem_list")
     actions = ButtonsColumn(model=models.AutonomousSystem)
-    asn_asdot = tables.Column(accessor=A("asn_asdot"), linkify=True, order_by=A("asn"), verbose_name="ASN ASDOT")
+    asn_asdot = tables.Column(
+        accessor=A("asn_asdot"),
+        linkify=True,
+        order_by=A("asn"),
+        verbose_name="ASN ASDOT",
+    )
 
     class Meta(BaseTable.Meta):
         model = models.AutonomousSystem
-        fields = ("pk", "asn", "asn_asdot", "status", "provider", "description", "tags")
-        default_columns = ("pk", "asn", "status", "provider", "description", "tags")
+        fields = (
+            "pk",
+            "asn",
+            "asn_asdot",
+            "status",
+            "provider",
+            "description",
+            "tags",
+            "vrf",
+        )
+        default_columns = (
+            "pk",
+            "asn",
+            "status",
+            "provider",
+            "description",
+            "tags",
+            "vrf",
+        )
 
 
 class AutonomousSystemRangeTable(StatusTableMixin, BaseTable):
@@ -52,12 +75,22 @@ class AutonomousSystemRangeTable(StatusTableMixin, BaseTable):
     asn_min = tables.LinkColumn()
     asn_max = tables.LinkColumn()
     tenant = tables.LinkColumn()
+    vrf = tables.LinkColumn()
     tags = TagColumn(url_name="plugins:nautobot_bgp_models:autonomoussystemrange_list")
     actions = ButtonsColumn(model=models.AutonomousSystemRange)
 
     class Meta(BaseTable.Meta):
         model = models.AutonomousSystemRange
-        fields = ("pk", "name", "asn_min", "asn_max", "tenant", "description", "tags")
+        fields = (
+            "pk",
+            "name",
+            "asn_min",
+            "asn_max",
+            "tenant",
+            "description",
+            "tags",
+            "vrf",
+        )
 
 
 class BGPRoutingInstanceTable(StatusTableMixin, BaseTable):
@@ -77,7 +110,14 @@ class BGPRoutingInstanceTable(StatusTableMixin, BaseTable):
 
     class Meta(BaseTable.Meta):
         model = models.BGPRoutingInstance
-        fields = ("pk", "routing_instance", "device", "autonomous_system", "router_id", "tags")
+        fields = (
+            "pk",
+            "routing_instance",
+            "device",
+            "autonomous_system",
+            "router_id",
+            "tags",
+        )
         default_columns = (
             "pk",
             "routing_instance",
@@ -233,11 +273,15 @@ class PeeringTable(StatusTableMixin, BaseTable):
     )
 
     endpoint_a = tables.LinkColumn(
-        verbose_name="Endpoint", text=lambda x: str(x.endpoint_a.local_ip) if x.endpoint_a else None, orderable=False
+        verbose_name="Endpoint",
+        text=lambda x: str(x.endpoint_a.local_ip) if x.endpoint_a else None,
+        orderable=False,
     )
 
     endpoint_z = tables.LinkColumn(
-        verbose_name="Endpoint", text=lambda x: str(x.endpoint_z.local_ip) if x.endpoint_z else None, orderable=False
+        verbose_name="Endpoint",
+        text=lambda x: str(x.endpoint_z.local_ip) if x.endpoint_z else None,
+        orderable=False,
     )
     actions = ButtonsColumn(model=models.Peering)
 

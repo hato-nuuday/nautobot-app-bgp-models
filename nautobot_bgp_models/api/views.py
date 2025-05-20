@@ -4,6 +4,9 @@ from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from nautobot.apps.api import NautobotModelViewSet
 from rest_framework.filters import OrderingFilter
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework import status
 
 from nautobot_bgp_models import filters, models
 from nautobot_bgp_models.api.filter_backends import IncludeInheritedFilterBackend
@@ -33,6 +36,43 @@ class AutonomousSystemRangeViewSet(NautobotModelViewSet):
     queryset = models.AutonomousSystemRange.objects.all()
     serializer_class = serializers.AutonomousSystemRangeSerializer
     filterset_class = filters.AutonomousSystemRangeFilterSet
+
+    @action(detail=True, methods=["post"], url_path="create-next-asn")
+    def create_next_asn(self, request, pk=None):
+        """Create the next available ASN in this range for the specified VRF."""
+        instance = self.get_object()
+        vrf_id = request.data.get("vrf")
+        if not vrf_id:
+            return Response(
+                {"error": "vrf is required"}, status=status.HTTP_400_BAD_REQUEST
+            )
+        try:
+            vrf = models.VRF.objects.get(pk=vrf_id)
+        except models.VRF.DoesNotExist:
+            return Response(
+                {"error": "VRF not found"}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Find used ASNs in this range and VRF
+        used_asns = set(
+            models.AutonomousSystem.objects.filter(
+                asn__gte=instance.asn_min,
+                asn__lte=instance.asn_max,
+                vrf=vrf,
+            ).values_list("asn", flat=True)
+        )
+        # Find the next available ASN
+        for asn in range(instance.asn_min, instance.asn_max + 1):
+            if asn not in used_asns:
+                new_asn = models.AutonomousSystem.objects.create(asn=asn, vrf=vrf)
+                serializer = serializers.AutonomousSystemSerializer(
+                    new_asn, context={"request": request}
+                )
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(
+            {"error": "No available ASN in this range for this VRF"},
+            status=status.HTTP_409_CONFLICT,
+        )
 
 
 include_inherited = OpenApiParameter(
@@ -100,7 +140,9 @@ class AddressFamilyViewSet(InheritableFieldsViewSetMixin, NautobotModelViewSet):
     filterset_class = filters.AddressFamilyFilterSet
 
 
-class PeerGroupAddressFamilyViewSet(InheritableFieldsViewSetMixin, NautobotModelViewSet):
+class PeerGroupAddressFamilyViewSet(
+    InheritableFieldsViewSetMixin, NautobotModelViewSet
+):
     """REST API viewset for PeerGroupAddressFamily records."""
 
     queryset = models.PeerGroupAddressFamily.objects.all()
@@ -108,7 +150,9 @@ class PeerGroupAddressFamilyViewSet(InheritableFieldsViewSetMixin, NautobotModel
     filterset_class = filters.PeerGroupAddressFamilyFilterSet
 
 
-class PeerEndpointAddressFamilyViewSet(InheritableFieldsViewSetMixin, NautobotModelViewSet):
+class PeerEndpointAddressFamilyViewSet(
+    InheritableFieldsViewSetMixin, NautobotModelViewSet
+):
     """REST API viewset for PeerEndpointAddressFamily records."""
 
     queryset = models.PeerEndpointAddressFamily.objects.all()

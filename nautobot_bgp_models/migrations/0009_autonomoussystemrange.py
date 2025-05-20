@@ -24,24 +24,49 @@ class Migration(migrations.Migration):
                 (
                     "id",
                     models.UUIDField(
-                        default=uuid.uuid4, editable=False, primary_key=True, serialize=False, unique=True
+                        default=uuid.uuid4,
+                        editable=False,
+                        primary_key=True,
+                        serialize=False,
+                        unique=True,
                     ),
                 ),
                 ("created", models.DateTimeField(auto_now_add=True, null=True)),
                 ("last_updated", models.DateTimeField(auto_now=True, null=True)),
                 (
                     "_custom_field_data",
-                    models.JSONField(blank=True, default=dict, encoder=django.core.serializers.json.DjangoJSONEncoder),
+                    models.JSONField(
+                        blank=True,
+                        default=dict,
+                        encoder=django.core.serializers.json.DjangoJSONEncoder,
+                    ),
                 ),
                 ("name", models.CharField(max_length=255, unique=True)),
                 ("asn_min", nautobot.dcim.fields.ASNField()),
                 ("asn_max", nautobot.dcim.fields.ASNField()),
                 ("description", models.CharField(blank=True, max_length=255)),
-                ("tags", nautobot.core.models.fields.TagsField(through="extras.TaggedItem", to="extras.Tag")),
+                (
+                    "tags",
+                    nautobot.core.models.fields.TagsField(
+                        through="extras.TaggedItem", to="extras.Tag"
+                    ),
+                ),
                 (
                     "tenant",
                     models.ForeignKey(
-                        blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, to="tenancy.tenant"
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.PROTECT,
+                        to="tenancy.tenant",
+                    ),
+                ),
+                (
+                    "vrf",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.PROTECT,
+                        to="ipam.vrf",
                     ),
                 ),
             ],

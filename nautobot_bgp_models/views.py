@@ -43,15 +43,19 @@ class AutonomousSystemRangeUIViewSet(NautobotUIViewSet):
         """Return any additional context data for the template."""
         context = super().get_extra_context(request, instance)
         if self.action == "retrieve":
-            asns = models.AutonomousSystem.objects.filter(asn__gte=instance.asn_min, asn__lte=instance.asn_max)
+            asns = models.AutonomousSystem.objects.filter(
+                asn__gte=instance.asn_min,
+                asn__lte=instance.asn_max,
+                vrf=instance.vrf,
+            )
             asns = helpers.add_available_asns(instance, asns)
 
             asn_table = tables.AutonomousSystemTable(asns)
             asn_table.columns.hide("actions")
 
-            if request.user.has_perm("nautobot_bgp_models.change_autonomoussystem") or request.user.has_perm(
-                "nautobot_bgp_models.delete_autonomoussystem"
-            ):
+            if request.user.has_perm(
+                "nautobot_bgp_models.change_autonomoussystem"
+            ) or request.user.has_perm("nautobot_bgp_models.delete_autonomoussystem"):
                 asn_table.columns.show("pk")
 
             paginate = {
@@ -166,11 +170,19 @@ class PeeringAddView(generic.ObjectEditView):
     def post(self, request, *args, **kwargs):
         """Post Method."""
         peering_form = forms.PeeringForm(request.POST, prefix="peering")
-        peerendpoint_a_form = forms.PeerEndpointForm(request.POST, prefix="peerendpoint_a")
-        peerendpoint_z_form = forms.PeerEndpointForm(request.POST, prefix="peerendpoint_z")
+        peerendpoint_a_form = forms.PeerEndpointForm(
+            request.POST, prefix="peerendpoint_a"
+        )
+        peerendpoint_z_form = forms.PeerEndpointForm(
+            request.POST, prefix="peerendpoint_z"
+        )
 
         try:
-            if peering_form.is_valid() and peerendpoint_a_form.is_valid() and peerendpoint_z_form.is_valid():
+            if (
+                peering_form.is_valid()
+                and peerendpoint_a_form.is_valid()
+                and peerendpoint_z_form.is_valid()
+            ):
                 with transaction.atomic():
                     peering = peering_form.save()
 
@@ -260,11 +272,15 @@ class BgpExtraAttributesView(View):
 
     base_template = None
 
-    def get(self, request, model, **kwargs):  # pylint: disable=missing-function-docstring
+    def get(
+        self, request, model, **kwargs
+    ):  # pylint: disable=missing-function-docstring
         """Getter."""
         # Handle QuerySet restriction of parent object if needed
         if hasattr(model.objects, "restrict"):
-            obj = get_object_or_404(model.objects.restrict(request.user, "view"), **kwargs)
+            obj = get_object_or_404(
+                model.objects.restrict(request.user, "view"), **kwargs
+            )
         else:
             obj = get_object_or_404(model, **kwargs)
 
@@ -274,9 +290,13 @@ class BgpExtraAttributesView(View):
         if request.GET.get("format") in ["json", "yaml"]:
             _format = request.GET.get("format")
             if request.user.is_authenticated:
-                request.user.set_config("nautobot_bgp_models.extraattributes.format", _format, commit=True)
+                request.user.set_config(
+                    "nautobot_bgp_models.extraattributes.format", _format, commit=True
+                )
         elif request.user.is_authenticated:
-            _format = request.user.get_config("nautobot_bgp_models.extraattributes.format", "json")
+            _format = request.user.get_config(
+                "nautobot_bgp_models.extraattributes.format", "json"
+            )
         else:
             _format = "json"
 
