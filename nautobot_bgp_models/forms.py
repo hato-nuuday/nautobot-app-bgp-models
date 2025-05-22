@@ -36,7 +36,10 @@ class AutonomousSystemFilterForm(NautobotFilterForm):
     """Form for filtering AutonomousSystem records in combination with AutonomousSystemFilterSet."""
 
     model = models.AutonomousSystem
-    field_order = ["status", "tag"]
+    field_order = ["status", "vrf", "tag"]  # Add "vrf" here
+    vrf = DynamicModelChoiceField(
+        queryset=VRF.objects.all(), required=False
+    )  # <-- Add this line
     tag = TagFilterField(model)
 
 
@@ -380,6 +383,7 @@ class PeerEndpointForm(NautobotModelForm):
     def __init__(self, *args, **kwargs):
         """Init."""
         super().__init__(*args, **kwargs)
+        print(self.fields.keys())
 
         if self.initial.get("routing_instance"):
             self.fields["routing_instance"].disabled = True
@@ -410,16 +414,27 @@ class PeerEndpointForm(NautobotModelForm):
         label="Autonomous System",
     )
 
+    vrf = DynamicModelChoiceField(
+        queryset=VRF.objects.all(),
+        required=False,
+        label="VRF",
+        query_params={
+            "device": "$routing_instance__device",
+        },
+    )
+
     source_ip = DynamicModelChoiceField(
         queryset=IPAddress.objects.all(),
         required=False,
         label="Source IP Address",
+        query_params={"vrf": "$vrf"},
     )
 
     source_interface = DynamicModelChoiceField(
         queryset=Interface.objects.all(),
         required=False,
         label="Source Interface",
+        query_params={"vrf": "$vrf"},
     )
 
     peer_group = DynamicModelChoiceField(
@@ -453,6 +468,7 @@ class PeerEndpointForm(NautobotModelForm):
             "secret",
             "extra_attributes",
             "tags",
+            "vrf",
         )
 
     def save(self, commit=True):

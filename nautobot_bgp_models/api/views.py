@@ -41,7 +41,7 @@ class AutonomousSystemRangeViewSet(NautobotModelViewSet):
     def create_next_asn(self, request, pk=None):
         """Create the next available ASN in this range for the specified VRF."""
         instance = self.get_object()
-        vrf_id = request.data.get("vrf")
+        vrf_id = instance.vrf_id
         if not vrf_id:
             return Response(
                 {"error": "vrf is required"}, status=status.HTTP_400_BAD_REQUEST

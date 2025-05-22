@@ -507,6 +507,14 @@ class PeerEndpoint(PrimaryModel, InheritanceMixin, BGPExtraAttributesMixin):
 
     enabled = models.BooleanField(default=True)
 
+    vrf = models.ForeignKey(
+        to=VRF,
+        on_delete=models.PROTECT,
+        blank=True,
+        null=True,
+        related_name="bgp_peers",
+    )
+
     routing_instance = models.ForeignKey(
         to=BGPRoutingInstance,
         on_delete=models.CASCADE,

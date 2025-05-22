@@ -35,6 +35,16 @@
                 {% endif %}
             </tr>
             <tr>
+                <td>VRF</td>
+                <td>
+                {% if endpoint.vrf %}
+                    <a href="{% url 'ipam:vrf' pk=endpoint.vrf.pk %}">{{ endpoint.vrf }}</a>
+                {% else %}
+                    <span class="text-muted">None</span>
+                {% endif %}
+            </td>
+            </tr>
+            <tr>
                 <td>Local IP Address</td>
                 <td>
                 {% if endpoint.fields_inherited.source_ip.value %}

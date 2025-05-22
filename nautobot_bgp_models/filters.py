@@ -27,10 +27,14 @@ class AutonomousSystemFilterSet(NautobotFilterSet, StatusModelFilterSetMixin):
             "description": "icontains",
         },
     )
+    vrf = django_filters.ModelChoiceFilter(
+        queryset=VRF.objects.all(),
+        label="VRF",
+    )
 
     class Meta:
         model = models.AutonomousSystem
-        fields = ["id", "asn", "status", "tags"]
+        fields = ["id", "asn", "status", "tags", "vrf"]
 
 
 class AutonomousSystemRangeFilterSet(NautobotFilterSet):
@@ -239,7 +243,9 @@ class PeeringFilterSet(
         fields = ["id"]
 
 
-class AddressFamilyFilterSet(BaseFilterSet, CreatedUpdatedModelFilterSetMixin, CustomFieldModelFilterSetMixin):
+class AddressFamilyFilterSet(
+    BaseFilterSet, CreatedUpdatedModelFilterSetMixin, CustomFieldModelFilterSetMixin
+):
     """Filtering of AddressFamily records."""
 
     q = SearchFilter(
@@ -274,7 +280,9 @@ class AddressFamilyFilterSet(BaseFilterSet, CreatedUpdatedModelFilterSetMixin, C
         ]
 
 
-class PeerGroupAddressFamilyFilterSet(BaseFilterSet, CreatedUpdatedModelFilterSetMixin, CustomFieldModelFilterSetMixin):
+class PeerGroupAddressFamilyFilterSet(
+    BaseFilterSet, CreatedUpdatedModelFilterSetMixin, CustomFieldModelFilterSetMixin
+):
     """Filtering of PeerGroupAddressFamily records."""
 
     q = SearchFilter(
